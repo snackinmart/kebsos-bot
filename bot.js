@@ -7,12 +7,23 @@ const fs = require('fs');
 const path = './order_data.json';
 
 // Ganti sesuai punyamu
-const TELEGRAM_TOKEN = '7635366583:AAFFhuSxrX_i-8lyLzQri_8g04cVIxIAtZo';
+const TELEGRAM_TOKEN = '7569525387:AAFcAEmODPRcaZIwDWgIkC6zT1waoEqJExE';
 const TRYONPEDIA_API_ID = 'TEpwaDQ0RFdaTnhFYWs0dlUwUDE5QT09';
 const TRYONPEDIA_API_KEY = '465a31-681bf5-e076df-2271c0-ccd4ae';
-const ADMIN_ID = -1001873253225; // ganti dengan chat ID kamu
+const ADMIN_ID = -1001873253225; // chat ID 
+
 
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
+
+bot.setMyCommands([
+  { command: 'start', description: 'Mulai bot Kebsos' },
+  { command: 'kategori', description: 'Lihat daftar layanan' },
+  { command: 'order', description: 'Buat order baru' },
+  { command: 'cek', description: 'Cek status order' },
+  { command: 'cek_harga', description: 'Cek harga per jumlah' },
+  { command: 'riwayat', description: 'Lihat riwayat order' }
+]);
+
 
 let orderData = {};
 if (fs.existsSync(path)) {
@@ -23,6 +34,7 @@ function simpanOrder() {
   fs.writeFileSync(path, JSON.stringify(orderData, null, 2));
 }
 
+const adminOrderState = {};
 const layananPerHalaman = 5;
 let layananData = [];
 let penggunaHalaman = {};
@@ -44,7 +56,7 @@ async function ambilSemuaLayanan() {
 }
 
 function formatLayanan(data) {
-  return data.map(item => `🆔 *${item.id}*\n📌 ${item.name}\n💰 Rp ${parseInt(item.price * 2.12).toLocaleString('id-ID')} (harga jual)\n`).join('\n');
+  return data.map(item => `🆔 *${item.id}*\n📌 ${item.name}\n💰 Rp ${parseInt(item.price /1000 * 2.12).toLocaleString('id-ID')} (harga satuan)\n 🔢 Min: ${item.min} | Max: ${item.max}\n⏱️ *Waktu Rata-rata:* ${item.average_time || 'Tidak diketahui'}\n`).join('\n');
 }
 
 function tampilkanLayanan(chatInfo, halaman = 1) {
@@ -91,15 +103,16 @@ function tampilkanLayanan(chatInfo, halaman = 1) {
 
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  const teks = `👋 Selamat datang di *Kebsos Bot*!
+  const teks = `👋 Selamat datang di *Kebsos Bot*\\!
 
-📌 Perintah yang tersedia:
-/kategori — Lihat daftar layanan
-/order <layanan_id> <url> <jumlah> — Buat order baru
-/cek <order_id> — Cek status order
-/riwayat — Lihat riwayat order`;
-
-  bot.sendMessage(chatId, teks, { parse_mode: 'Markdown' });
+📌 *Perintah yang tersedia:*
+\\/kategori \\- Lihat daftar layanan  
+\\/order \\<layanan\\_id\\> \\<url\\> \\<jumlah\\> \\- Buat order baru  
+\\/cek \\<order\\_id\\> \\- Cek status order  
+\\/cek\\_harga \\<layanan\\_id\\> \\<jumlah\\> \\- Cek harga per jumlah  
+\\/riwayat \\- Lihat riwayat order`;
+  
+  bot.sendMessage(chatId, teks, { parse_mode: "MarkdownV2" });
 });
 
 bot.onText(/\/help/, (msg) => {
@@ -348,9 +361,6 @@ bot.on("polling_error", (err) => {
   console.error("Polling Error:", err);
 });
 
-
-
-
 // ========= LAYANAN =========
 
 // Kalau user kirim "/layanan" aja, langsung tampilkan halaman 1
@@ -402,7 +412,7 @@ bot.onText(/^\/kategori$/, (msg) => {
   const kategori = [
     [{ text: '🎵 TikTok', callback_data: 'filter_TikTok' }],
     [{ text: '📸 Instagram', callback_data: 'filter_Instagram' }],
-    [{ text: '▶️ YouTube', callback_data: 'filter_YouTube' }],
+    [{ text: '▶️ Telegram', callback_data: 'filter_Telegram' }],
     [{ text: '🧹 Hapus Filter', callback_data: 'filter_reset' }]
   ];
 
@@ -428,7 +438,7 @@ bot.onText(/\/cek_harga (\d+)\s+(\d+)/, async (msg, match) => {
   const harga = Math.round((hargaPer1000 / 1000) * quantity);
 
 bot.sendMessage(chatId,
-    `💰 Harga untuk layanan *${layanan.name}* (ID: ${serviceId}) sebanyak ${quantity}:\n\n➡️ *Rp ${harga.toLocaleString('id-ID')}*`, {
+    `💰 Harga untuk layanan *${layanan.name}*\n\n(ID: ${serviceId}) sebanyak ${quantity}\n➡️ *Rp ${harga.toLocaleString('id-ID')}*`, {
     parse_mode: 'Markdown'
   });
 });
@@ -474,8 +484,8 @@ bot.on('callback_query', async (query) => {
         simpanOrder();
 
         bot.sendMessage(order.user_id,
-`✅ *Pembayaran Diverifikasi!*
-Pesanan kamu sudah berhasil diproses oleh *Snackin Kebsos*. 🎉
+`✅ *Orderan Berhasil!*
+Pesanan kamu sudah berhasil diproses oleh *@kebsosmartbot*. 🎉
 
 🆔 Order ID: *${order.order_id}*
 📌 Layanan: ${order.service_name}
@@ -483,7 +493,7 @@ Pesanan kamu sudah berhasil diproses oleh *Snackin Kebsos*. 🎉
 🔢 Jumlah: ${order.quantity}
 💰 Harga: Rp *${order.harga.toLocaleString('id-ID')}*
 
-⏳ Harap tunggu beberapa saat. Proses biasanya memakan waktu beberapa menit.`, { parse_mode: 'Markdown' });
+⏳ Harap tunggu beberapa saat. Proses biasanya memakan waktu untuk masuk ke akun.`, { parse_mode: 'Markdown' });
 
         bot.sendMessage(chatId, '✅ Order berhasil diproses ke API.');
       } else {
